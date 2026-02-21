@@ -117,16 +117,24 @@ add_action( 'init', function () {
 
 	// Core canonical (used by the default rel=canonical output).
 	add_filter( 'get_canonical_url', function ( $url ) use ( $host ) {
-		$scheme = is_ssl() ? 'https://' : 'http://';
+		$scheme  = is_ssl() ? 'https://' : 'http://';
 		$req_uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '/';
-		return $scheme . $host . $req_uri;
+		$path    = parse_url( $req_uri, PHP_URL_PATH );
+		if ( $path === null || $path === '' ) {
+			$path = '/';
+		}
+		return $scheme . $host . $path;
 	}, 10, 1 );
 
 	// Yoast SEO canonical override.
 	add_filter( 'wpseo_canonical', function ( $url ) use ( $host ) {
-		$scheme = is_ssl() ? 'https://' : 'http://';
+		$scheme  = is_ssl() ? 'https://' : 'http://';
 		$req_uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '/';
-		return $scheme . $host . $req_uri;
+		$path    = parse_url( $req_uri, PHP_URL_PATH );
+		if ( $path === null || $path === '' ) {
+			$path = '/';
+		}
+		return $scheme . $host . $path;
 	}, 10, 1 );
 
 }, 1 );
