@@ -31,6 +31,9 @@ add_action( 'init', function () {
 	if ( php_sapi_name() === 'cli' ) {
 		return;
 	}
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		return;
+	}
 
 	$host = isset( $_SERVER['HTTP_HOST'] )   ? $_SERVER['HTTP_HOST']   : '';
 	$uri  = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '/';
@@ -48,8 +51,8 @@ add_action( 'init', function () {
 		return;
 	}
 
-	// Defense-in-depth: hard-block xmlrpc on alias domains.
-	if ( $host !== SPX_PRIMARY_DOMAIN && strpos( $uri, 'xmlrpc.php' ) !== false ) {
+	// Defense-in-depth: hard-block xmlrpc on alias domains (exact path only).
+	if ( $host !== SPX_PRIMARY_DOMAIN && preg_match( '#^/xmlrpc\.php$#', $uri ) ) {
 		status_header( 403 );
 		exit;
 	}
@@ -72,7 +75,7 @@ add_action( 'init', function () {
 			$parsed['host'] !== $host
 		) {
 			$scheme = is_ssl() ? 'https://' : 'http://';
-			wp_redirect( $scheme . $parsed['host'] . $uri, 301 );
+			wp_safe_redirect( $scheme . $parsed['host'] . $uri, 301 );
 			exit;
 		}
 

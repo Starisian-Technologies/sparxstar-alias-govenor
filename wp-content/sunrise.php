@@ -48,7 +48,11 @@ if ( php_sapi_name() !== 'cli' ) {
 				(bool) preg_match( '#^/' . preg_quote( $spx_def_slug, '#' ) . '(/|$)#', $spx_uri )
 			);
 
-		if ( $spx_is_sensitive && $spx_host !== SPX_PRIMARY_DOMAIN ) {
+		if (
+			$spx_is_sensitive &&
+			$spx_host !== SPX_PRIMARY_DOMAIN &&
+			stripos( $spx_uri, 'spx_return=' ) === false
+		) {
 
 			/*
 			 * Hard-block mode (403): uncomment the two lines below and remove
