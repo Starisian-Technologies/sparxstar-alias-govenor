@@ -58,8 +58,11 @@ add_action( 'init', function () {
 
 	// Defense-in-depth: hard-block xmlrpc on alias domains (exact path only).
 	if ( $host !== SPX_PRIMARY_DOMAIN && preg_match( '#^/xmlrpc\.php$#', $uri ) ) {
-		status_header( 403 );
-		exit;
+		wp_die(
+			'XML-RPC endpoint is disabled on this domain.',
+			'Forbidden',
+			array( 'response' => 403 )
+		);
 	}
 
 	/**
