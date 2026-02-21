@@ -91,11 +91,25 @@ add_action( 'init', function () {
 	 * ALIAS domain frontend → rewrite all generated URLs + canonical to alias.
 	 */
 	add_filter( 'home_url', function ( $url, $path, $scheme ) use ( $host ) {
-		return rtrim( $scheme . '://' . $host, '/' ) . '/' . ltrim( $path, '/' );
+		$base           = rtrim( $scheme . '://' . $host, '/' );
+		$normalized_path = ltrim( (string) $path, '/' );
+
+		if ( $normalized_path === '' ) {
+			return $base . '/';
+		}
+
+		return $base . '/' . $normalized_path;
 	}, 10, 3 );
 
 	add_filter( 'site_url', function ( $url, $path, $scheme ) use ( $host ) {
-		return rtrim( $scheme . '://' . $host, '/' ) . '/' . ltrim( $path, '/' );
+		$base           = rtrim( $scheme . '://' . $host, '/' );
+		$normalized_path = ltrim( (string) $path, '/' );
+
+		if ( $normalized_path === '' ) {
+			return $base . '/';
+		}
+
+		return $base . '/' . $normalized_path;
 	}, 10, 3 );
 
 	// Core canonical (used by the default rel=canonical output).
