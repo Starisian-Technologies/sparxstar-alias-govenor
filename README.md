@@ -1,4 +1,4 @@
-# sparxstar-alias-govenor
+# sparxstar-alias-governor
 
 An SEO-compatible, domain governor MU-plugin for WordPress Multisite with Mercator that enforces the alias domain on the frontend during runtime.
 
