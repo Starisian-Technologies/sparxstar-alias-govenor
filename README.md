@@ -1,4 +1,7 @@
-# sparxstar-alias-governor
+
+<img width="1280" height="640" alt="sparxstar-alias-governor" src="https://github.com/user-attachments/assets/845ce9d1-aa0d-455f-8b2e-d9f049ca79fd" />
+
+# SPARXSTAR Alias Governor 
 
 An SEO-compatible, domain governor MU-plugin for WordPress Multisite with Mercator that enforces the alias domain on the frontend during runtime.
 
