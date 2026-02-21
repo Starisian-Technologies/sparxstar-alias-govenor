@@ -175,23 +175,26 @@ add_filter( 'wpseo_sitemap_url', function ( $url ) {
 // ---------------------------------------------------------------------------
 add_filter( 'login_redirect', function ( $redirect_to, $requested_redirect_to, $user ) {
 
-	$return = isset( $_GET['spx_return'] ) ? $_GET['spx_return'] : '';
+	$return = isset( $_GET['spx_return'] ) ? wp_unslash( $_GET['spx_return'] ) : '';
 	$return = is_string( $return ) ? $return : '';
 
 	// Allow only safe hostname characters (letters, digits, dots, hyphens).
 	$return = preg_replace( '/[^a-z0-9.\-]/i', '', $return );
+	$return = trim( $return );
 
-	// Must look like a real hostname (at least one dot, no consecutive dots,
-	// not a bare IP address) to guard against open-redirect misuse.
-	if (
-		$return !== '' &&
-		$return !== SPX_PRIMARY_DOMAIN &&
-		strpos( $return, '.' ) !== false &&
-		strpos( $return, '..' ) === false &&
-		! preg_match( '/^(\d{1,3}\.){3}\d{1,3}$/', $return )
-	) {
+	// Restrict redirects to an explicit whitelist of allowed alias hostnames.
+	// Site owners can filter this list via 'spx_allowed_login_return_hosts'.
+	$allowed_hosts = apply_filters( 'spx_allowed_login_return_hosts', array() );
+	if ( ! is_array( $allowed_hosts ) ) {
+		$allowed_hosts = array();
+	}
+	$allowed_hosts = array_map( 'strtolower', array_filter( array_map( 'trim', $allowed_hosts ) ) );
+
+	$return_lc = strtolower( $return );
+
+	if ( $return_lc !== '' && in_array( $return_lc, $allowed_hosts, true ) ) {
 		$scheme = is_ssl() ? 'https://' : 'http://';
-		return $scheme . $return . '/';
+		return $scheme . $return_lc . '/';
 	}
 
 	return $redirect_to;
