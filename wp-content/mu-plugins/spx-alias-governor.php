@@ -35,7 +35,12 @@ add_action( 'init', function () {
 		return;
 	}
 
-	$host = isset( $_SERVER['HTTP_HOST'] )   ? $_SERVER['HTTP_HOST']   : '';
+	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	$host     = '';
+
+	if ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) {
+		$host = $raw_host;
+	}
 	$uri  = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '/';
 
 	if ( $host === '' ) {
