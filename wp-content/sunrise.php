@@ -41,9 +41,12 @@ if ( php_sapi_name() !== 'cli' ) {
 		$spx_def_slug = trim( (string) SPX_DEFENDER_LOGIN_SLUG, '/' );
 
 		$spx_is_sensitive =
-			( strpos( $spx_uri, 'wp-admin' )    !== false ) ||
-			( strpos( $spx_uri, 'wp-login.php') !== false ) ||
-			( $spx_def_slug !== '' && strpos( $spx_uri, '/' . $spx_def_slug ) !== false );
+			( strpos( $spx_uri, 'wp-admin' )     !== false ) ||
+			( strpos( $spx_uri, 'wp-login.php' ) !== false ) ||
+			(
+				$spx_def_slug !== '' &&
+				(bool) preg_match( '#^/' . preg_quote( $spx_def_slug, '#' ) . '(/|$)#', $spx_uri )
+			);
 
 		if ( $spx_is_sensitive && $spx_host !== SPX_PRIMARY_DOMAIN ) {
 
@@ -73,7 +76,7 @@ if ( php_sapi_name() !== 'cli' ) {
 				'Location: ' . $spx_scheme . SPX_PRIMARY_DOMAIN . $spx_uri
 				. $spx_glue . 'spx_return=' . $spx_return_host,
 				true,
-				302
+				307
 			);
 			exit;
 		}

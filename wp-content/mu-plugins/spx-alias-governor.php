@@ -66,7 +66,11 @@ add_action( 'init', function () {
 		$home   = home_url( '/' );
 		$parsed = wp_parse_url( $home );
 
-		if ( ! empty( $parsed['host'] ) && $parsed['host'] !== SPX_PRIMARY_DOMAIN ) {
+		if (
+			! empty( $parsed['host'] ) &&
+			$parsed['host'] !== SPX_PRIMARY_DOMAIN &&
+			$parsed['host'] !== $host
+		) {
 			$scheme = is_ssl() ? 'https://' : 'http://';
 			wp_redirect( $scheme . $parsed['host'] . $uri, 301 );
 			exit;
@@ -79,11 +83,11 @@ add_action( 'init', function () {
 	 * ALIAS domain frontend → rewrite all generated URLs + canonical to alias.
 	 */
 	add_filter( 'home_url', function ( $url, $path, $scheme ) use ( $host ) {
-		return $scheme . '://' . $host . '/' . ltrim( $path, '/' );
+		return rtrim( $scheme . '://' . $host, '/' ) . '/' . ltrim( $path, '/' );
 	}, 10, 3 );
 
 	add_filter( 'site_url', function ( $url, $path, $scheme ) use ( $host ) {
-		return $scheme . '://' . $host . '/' . ltrim( $path, '/' );
+		return rtrim( $scheme . '://' . $host, '/' ) . '/' . ltrim( $path, '/' );
 	}, 10, 3 );
 
 	// Core canonical (used by the default rel=canonical output).
@@ -117,12 +121,19 @@ add_filter( 'wpseo_sitemap_url', function ( $url ) {
 		return $url;
 	}
 
-	// Replace any primary domain occurrence in sitemap URLs with the alias.
-	return str_replace(
-		array( 'https://' . SPX_PRIMARY_DOMAIN, 'http://' . SPX_PRIMARY_DOMAIN ),
-		array( 'https://' . $host,               'http://' . $host ),
-		$url
-	);
+	// Replace the primary domain prefix only (avoids false matches in query strings).
+	$primary_https = 'https://' . SPX_PRIMARY_DOMAIN;
+	$primary_http  = 'http://'  . SPX_PRIMARY_DOMAIN;
+
+	if ( strpos( $url, $primary_https ) === 0 ) {
+		return 'https://' . $host . substr( $url, strlen( $primary_https ) );
+	}
+
+	if ( strpos( $url, $primary_http ) === 0 ) {
+		return 'http://' . $host . substr( $url, strlen( $primary_http ) );
+	}
+
+	return $url;
 
 }, 10, 1 );
 
