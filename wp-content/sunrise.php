@@ -33,8 +33,10 @@ if ( ! defined( 'SPX_DEFENDER_LOGIN_SLUG' ) ) {
 
 if ( php_sapi_name() !== 'cli' ) {
 
-	$spx_host = isset( $_SERVER['HTTP_HOST'] )    ? $_SERVER['HTTP_HOST']    : '';
-	$spx_uri  = isset( $_SERVER['REQUEST_URI'] )  ? $_SERVER['REQUEST_URI']  : '/';
+	$spx_host_raw = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	// Allow only valid hostname characters (alphanumeric, dots, and hyphens).
+	$spx_host     = preg_replace( '/[^A-Za-z0-9\.-]/', '', $spx_host_raw );
+	$spx_uri      = isset( $_SERVER['REQUEST_URI'] )  ? $_SERVER['REQUEST_URI']  : '/';
 
 	if ( $spx_host !== '' ) {
 
