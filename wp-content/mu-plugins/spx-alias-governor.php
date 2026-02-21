@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: SPARXSTAR Alias Governor
- * Plugin URI:  https://github.com/Starisian-Technologies/sparxstar-alias-govenor
+ * Plugin URI:  https://github.com/Starisian-Technologies/sparxstar-alias-governor
  * Description: Enforces alias domain on frontend, keeps wp-admin / login on primary, forces canonical to alias, and supports Mercator + WPMU DEV Defender.
  * Version:     1.0.0
  * Author:      Starisian Technologies
