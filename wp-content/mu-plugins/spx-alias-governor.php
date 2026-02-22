@@ -17,8 +17,8 @@
  *
  * NOTE: Do NOT define COOKIE_DOMAIN when using Mercator.
  * Mercator manages cookie domains internally; defining COOKIE_DOMAIN will cause
- * the error: "The constant COOKIE_DOMAIN is defined … Please remove or comment out
- * that define() line."
+ * the error: "The constant COOKIE_DOMAIN is defined (probably in wp-config.php). Please
+ * remove or comment out that define() line."
  */
 
 defined( 'ABSPATH' ) || exit;
