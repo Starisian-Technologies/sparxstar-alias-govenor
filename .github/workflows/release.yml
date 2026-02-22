@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          SHA="${GITHUB_SHA::8}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "zip=spx-alias-governor-${VERSION}-${SHA}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Update version in plugin header
+        run: |
+          sed -i "s/^ \* Version:.*$/ * Version:     ${{ steps.version.outputs.version }}/" \
+            mu-plugins/spx-alias-governor.php
+
+      - name: Build release zip
+        run: |
+          mkdir -p build/wp-content/mu-plugins
+          cp mu-plugins/spx-alias-governor.php build/wp-content/mu-plugins/
+          cp sunrise.php build/wp-content/
+          cd build
+          zip -r "../${{ steps.version.outputs.zip }}" wp-content/
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: ${{ steps.version.outputs.zip }}
+          generate_release_notes: true
