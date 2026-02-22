@@ -54,11 +54,14 @@ define( 'SPX_PRIMARY_DOMAIN', 'sparxstar.com' );
 define( 'SPX_DEFENDER_LOGIN_SLUG', 'secure-access' );
 
 /**
- * Cookie isolation – auth cookies stay on the primary domain so alias
- * domains cannot carry wp-admin sessions.
- * Remove COOKIE_DOMAIN only if it breaks something.
+ * DO NOT define COOKIE_DOMAIN when using Mercator.
+ * Mercator manages cookie domains internally; defining COOKIE_DOMAIN
+ * will cause the error:
+ *   "The constant COOKIE_DOMAIN is defined (probably in wp-config.php).
+ *    Please remove or comment out that define() line."
+ * Leave this constant undefined so Mercator can function correctly.
  */
-define( 'COOKIE_DOMAIN', SPX_PRIMARY_DOMAIN );
+// define( 'COOKIE_DOMAIN', SPX_PRIMARY_DOMAIN ); // ← MUST remain commented out with Mercator
 ```
 
 ### Step 1 – `wp-content/sunrise.php`
