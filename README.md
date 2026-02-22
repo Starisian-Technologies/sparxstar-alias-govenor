@@ -22,16 +22,44 @@ This stack (sunrise + MU-plugin + `wp-config.php` constants) provides:
 
 ---
 
-## Files
+## Repository Layout
 
 ```
-wp-content/
-├── sunrise.php                        ← early lock + Mercator include
-└── mu-plugins/
-    └── spx-alias-governor.php         ← frontend alias, canonical, post-login return
+mu-plugins/
+└── spx-alias-governor.php   ← frontend alias, canonical, post-login return
+sunrise.php                  ← early lock + Mercator include
 ```
 
-`wp-config.php` constants are documented below but the file itself is not committed (it is in `.gitignore`).
+`wp-config.php` constants are documented below but the file itself is not
+committed to this repository.
+
+---
+
+## Installation
+
+### Option A – Download a release (recommended)
+
+1. Go to the [**Releases**](../../releases) page and download the latest
+   `spx-alias-governor-{version}-{sha}.zip`.
+2. Extract the zip. It contains a `wp-content/` folder with the files already
+   in the correct locations:
+   ```
+   wp-content/
+   ├── sunrise.php
+   └── mu-plugins/
+       └── spx-alias-governor.php
+   ```
+3. Copy both files into your WordPress installation's `wp-content/` directory,
+   preserving the sub-paths shown above.
+
+### Option B – Clone / copy from source
+
+Copy the files manually to your WordPress installation:
+
+| Repository path | WordPress install path |
+|---|---|
+| `sunrise.php` | `wp-content/sunrise.php` |
+| `mu-plugins/spx-alias-governor.php` | `wp-content/mu-plugins/spx-alias-governor.php` |
 
 ---
 
@@ -66,7 +94,8 @@ define( 'SPX_DEFENDER_LOGIN_SLUG', 'secure-access' );
 
 ### Step 1 – `wp-content/sunrise.php`
 
-Copy `wp-content/sunrise.php` from this repository to your install.
+Place `sunrise.php` (from this repository) at `wp-content/sunrise.php` in
+your WordPress installation.
 
 This file runs **before WordPress loads** (no WP functions available).  It:
 
@@ -83,8 +112,8 @@ redirect block if you never want alias login attempts forwarded.
 
 ### Step 2 – `wp-content/mu-plugins/spx-alias-governor.php`
 
-Copy `wp-content/mu-plugins/spx-alias-governor.php` from this repository to
-your install.
+Place `mu-plugins/spx-alias-governor.php` (from this repository) at
+`wp-content/mu-plugins/spx-alias-governor.php` in your WordPress installation.
 
 This MU-plugin (loaded automatically by WordPress) handles:
 
