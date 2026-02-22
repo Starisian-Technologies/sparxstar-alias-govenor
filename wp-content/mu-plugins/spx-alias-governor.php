@@ -14,7 +14,11 @@
  *   define( 'SUNRISE', true );
  *   define( 'SPX_PRIMARY_DOMAIN',      'sparxstar.com' );
  *   define( 'SPX_DEFENDER_LOGIN_SLUG', 'secure-access' );
- *   define( 'COOKIE_DOMAIN',           SPX_PRIMARY_DOMAIN );
+ *
+ * NOTE: Do NOT define COOKIE_DOMAIN when using Mercator.
+ * Mercator manages cookie domains internally; defining COOKIE_DOMAIN will cause
+ * the error: "The constant COOKIE_DOMAIN is defined (probably in wp-config.php). Please
+ * remove or comment out that define() line."
  */
 
 defined( 'ABSPATH' ) || exit;
