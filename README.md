@@ -17,6 +17,8 @@ This stack (sunrise + MU-plugin + `wp-config.php` constants) provides:
 | **Frontend** | Always served on the alias domain |
 | **Canonical** | Set to alias domain (supports both WordPress core and Yoast SEO) |
 | **Sitemap URLs** | Rewritten to alias domain (Yoast SEO sitemap filter) |
+| **Asset URLs** | `wp_get_attachment_url`, `srcset`, `script_loader_src`, `style_loader_src`, and more rewritten to alias via deep WP filters |
+| **HTML buffer** | Final safety net: `ob_start` on `template_redirect` catches any hard-coded primary-domain URLs in post content or theme templates |
 | **Hard 403 option** | Block alias login attempts instead of redirecting (commented toggle) |
 | **Return-to-alias** | After login on primary, user is sent back to the alias |
 
@@ -124,6 +126,15 @@ This MU-plugin (loaded automatically by WordPress) handles:
   generated links to use the alias host when serving the alias.
 - **Canonical tag**: Both the WordPress core canonical and the Yoast SEO
   canonical are overridden to the alias.
+- **Deep asset filters**: `wp_get_attachment_url`, `wp_get_attachment_image_src`,
+  `wp_calculate_image_srcset`, `content_url`, `plugins_url`, `theme_file_uri`,
+  `stylesheet_directory_uri`, `template_directory_uri`, `script_loader_src`,
+  `style_loader_src`, and `rest_url` are all rewritten to the alias domain so
+  that `srcset` and similar attributes never leak the primary domain.
+- **HTML output buffer**: An `ob_start` callback registered on `template_redirect`
+  replaces any remaining hard-coded primary-domain URLs in the final HTML
+  document (post content, theme templates, etc.) while leaving uploads-subdomain
+  URLs and non-HTML responses (REST, feeds, AJAX) untouched.
 - **Sitemap URLs**: Yoast SEO sitemap entries are rewritten to the alias domain.
 - **xmlrpc.php hardblock**: Returns 403 for XML-RPC requests on alias domains.
 - **Post-login return**: The `login_redirect` filter reads `spx_return` (set by
@@ -154,6 +165,9 @@ Browser request
               ▼                    ▼
         301 → alias          override home_url,
                              site_url, canonical,
+                             asset filters (srcset,
+                             script/style src, etc.),
+                             HTML output buffer,
                              sitemap URLs
 ```
 

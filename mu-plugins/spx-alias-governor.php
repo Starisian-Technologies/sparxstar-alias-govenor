@@ -166,7 +166,133 @@ add_action( 'init', function () {
 }, 1 );
 
 // ---------------------------------------------------------------------------
-// 2. Sitemap URL rewriting (Yoast SEO)
+// 2. Deep Asset Filters
+// Replaces the primary domain with the current alias for all standard WP asset hooks.
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper: replace the primary domain with the current alias in a simple string URL.
+ *
+ * Returns the original value unchanged when:
+ *  - running under CLI / WP-CLI
+ *  - inside wp-admin
+ *  - the URL is empty
+ *  - the URL belongs to the uploads subdomain
+ *  - the current host is the primary domain or cannot be determined
+ *
+ * @param string $url
+ * @return string
+ */
+function spx_replace_asset_domain( $url ) {
+	if ( php_sapi_name() === 'cli' || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+		return $url;
+	}
+	if ( is_admin() || empty( $url ) ) {
+		return $url;
+	}
+	// Skip assets that are explicitly on the uploads subdomain.
+	if ( strpos( $url, 'uploads.' . SPX_PRIMARY_DOMAIN ) !== false ) {
+		return $url;
+	}
+	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
+	if ( $host === '' || $host === SPX_PRIMARY_DOMAIN ) {
+		return $url;
+	}
+	return str_replace(
+		[ 'http://' . SPX_PRIMARY_DOMAIN, 'https://' . SPX_PRIMARY_DOMAIN ],
+		'https://' . $host,
+		$url
+	);
+}
+
+// Filters whose first argument is a plain string URL.
+$spx_asset_string_filters = [
+	'wp_get_attachment_url',
+	'content_url',
+	'plugins_url',
+	'theme_file_uri',
+	'stylesheet_directory_uri',
+	'template_directory_uri',
+	'script_loader_src',
+	'style_loader_src',
+	'rest_url',
+];
+
+foreach ( $spx_asset_string_filters as $spx_filter ) {
+	add_filter( $spx_filter, 'spx_replace_asset_domain', 99 );
+}
+unset( $spx_filter, $spx_asset_string_filters );
+
+// wp_get_attachment_image_src returns [ url, width, height, is_intermediate ] or false.
+add_filter( 'wp_get_attachment_image_src', function ( $image ) {
+	if ( ! is_array( $image ) || empty( $image[0] ) ) {
+		return $image;
+	}
+	$image[0] = spx_replace_asset_domain( $image[0] );
+	return $image;
+}, 99 );
+
+// wp_calculate_image_srcset returns [ width => [ 'url' => ..., 'descriptor' => ..., 'value' => ... ], ... ].
+add_filter( 'wp_calculate_image_srcset', function ( $sources ) {
+	if ( php_sapi_name() === 'cli' || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+		return $sources;
+	}
+	if ( ! is_array( $sources ) ) {
+		return $sources;
+	}
+	foreach ( $sources as $width => $source ) {
+		if ( isset( $source['url'] ) ) {
+			$sources[ $width ]['url'] = spx_replace_asset_domain( $source['url'] );
+		}
+	}
+	return $sources;
+}, 99 );
+
+// ---------------------------------------------------------------------------
+// 3. HTML-Only Output Buffer
+// The final safety net for hard-coded URLs in post_content or theme files.
+// ---------------------------------------------------------------------------
+add_action( 'template_redirect', function () {
+
+	if ( php_sapi_name() === 'cli' || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+		return;
+	}
+
+	// Guards: do not buffer non-frontend or non-HTML requests.
+	if ( is_admin() || wp_doing_ajax() || is_feed() ) {
+		return;
+	}
+	if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+		return;
+	}
+
+	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
+
+	if ( $host === '' || $host === SPX_PRIMARY_DOMAIN ) {
+		return;
+	}
+
+	ob_start( function ( $html ) use ( $host ) {
+		// Only run on actual HTML documents; skip REST, XML feeds, JSON, etc.
+		if ( stripos( $html, '<!DOCTYPE' ) === false && stripos( $html, '<html' ) === false ) {
+			return $html;
+		}
+		// Replace primary domain with alias.
+		// str_replace( 'https://' . SPX_PRIMARY_DOMAIN, ... ) does NOT match
+		// 'https://uploads.' . SPX_PRIMARY_DOMAIN, so uploads URLs are inherently safe.
+		return str_replace(
+			[ 'http://' . SPX_PRIMARY_DOMAIN, 'https://' . SPX_PRIMARY_DOMAIN ],
+			'https://' . $host,
+			$html
+		);
+	} );
+
+} );
+
+// ---------------------------------------------------------------------------
+// 4. Sitemap URL rewriting (Yoast SEO)
 // ---------------------------------------------------------------------------
 add_filter( 'wpseo_sitemap_url', function ( $url ) {
 
@@ -197,7 +323,7 @@ add_filter( 'wpseo_sitemap_url', function ( $url ) {
 }, 10, 1 );
 
 // ---------------------------------------------------------------------------
-// 3. Post-login: return user to alias if sunrise captured spx_return
+// 5. Post-login: return user to alias if sunrise captured spx_return
 // ---------------------------------------------------------------------------
 add_filter( 'login_redirect', function ( $redirect_to, $requested_redirect_to, $user ) {
 
