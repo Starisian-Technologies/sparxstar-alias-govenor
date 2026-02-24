@@ -23,6 +23,28 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// ---------------------------------------------------------------------------
+// Proxy fix: normalize HTTP_HOST and HTTPS from forwarded headers so that
+// Alias Governor sees the real domain and SSL status behind
+// Cloudflare → Nginx → Varnish → Apache stacks.
+// ---------------------------------------------------------------------------
+if ( php_sapi_name() !== 'cli' ) {
+	if ( isset( $_SERVER['HTTP_X_FORWARDED_HOST'] ) ) {
+		// When chained proxies append hosts, take only the first (original) value.
+		$spx_fwd_host = explode( ',', (string) $_SERVER['HTTP_X_FORWARDED_HOST'], 2 )[0];
+		$spx_fwd_host = preg_replace( '/[^A-Za-z0-9.-]/', '', trim( $spx_fwd_host ) );
+		if ( $spx_fwd_host !== '' ) {
+			$_SERVER['HTTP_HOST'] = $spx_fwd_host;
+		}
+	}
+	if (
+		isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) &&
+		(string) $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'
+	) {
+		$_SERVER['HTTPS'] = 'on';
+	}
+}
+
 if ( ! defined( 'SPX_PRIMARY_DOMAIN' ) ) {
 	define( 'SPX_PRIMARY_DOMAIN', 'sparxstar.com' );
 }
