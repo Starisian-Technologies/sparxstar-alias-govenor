@@ -313,14 +313,7 @@ add_filter( 'wp_calculate_image_srcset', function ( $sources ) {
 	}
 	return $sources;
 }, 99 );
-# last pass for missed urls
-add_filter('style_loader_tag', function($tag){
-    return spx_replace_asset_domain($tag);
-}, 99);
 
-add_filter('script_loader_tag', function($tag){
-    return spx_replace_asset_domain($tag);
-}, 99);
 
 // ---------------------------------------------------------------------------
 // 3. HTML-Only Output Buffer
