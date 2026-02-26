@@ -313,14 +313,6 @@ add_filter( 'wp_calculate_image_srcset', function ( $sources ) {
 	}
 	return $sources;
 }, 99 );
-# last pass for missed urls
-add_filter('style_loader_tag', function($tag){
-    return spx_replace_asset_domain($tag);
-}, 99);
-
-add_filter('script_loader_tag', function($tag){
-    return spx_replace_asset_domain($tag);
-}, 99);
 
 // ---------------------------------------------------------------------------
 // 3. HTML-Only Output Buffer
@@ -352,11 +344,18 @@ add_action( 'template_redirect', function () {
 		if ( stripos( $html, '<!DOCTYPE' ) === false && stripos( $html, '<html' ) === false ) {
 			return $html;
 		}
-		// Replace primary domain with alias.
-		// str_replace( 'https://' . SPX_PRIMARY_DOMAIN, ... ) does NOT match
-		// 'https://uploads.' . SPX_PRIMARY_DOMAIN, so uploads URLs are inherently safe.
+		// Replace all primary-domain URL variants with the alias.
+		// None of these prefixes match 'uploads.' . SPX_PRIMARY_DOMAIN, so
+		// uploads subdomain URLs are inherently preserved.
 		return str_replace(
-			[ 'http://' . SPX_PRIMARY_DOMAIN, 'https://' . SPX_PRIMARY_DOMAIN ],
+			[
+				'http://'      . SPX_PRIMARY_DOMAIN,
+				'https://'     . SPX_PRIMARY_DOMAIN,
+				'//'           . SPX_PRIMARY_DOMAIN,
+				'http://www.'  . SPX_PRIMARY_DOMAIN,
+				'https://www.' . SPX_PRIMARY_DOMAIN,
+				'//www.'       . SPX_PRIMARY_DOMAIN,
+			],
 			'https://' . $host,
 			$html
 		);
