@@ -120,25 +120,27 @@ add_action( 'init', function () {
 	 * ALIAS domain frontend → rewrite all generated URLs + canonical to alias.
 	 */
 	add_filter( 'home_url', function ( $url, $path, $scheme ) use ( $host ) {
-		$base           = rtrim( $scheme . '://' . $host, '/' );
-		$normalized_path = ltrim( (string) $path, '/' );
-
-		if ( $normalized_path === '' ) {
-			return $base . '/';
+		$parsed = wp_parse_url( $url );
+		if ( empty( $parsed['host'] ) || empty( $parsed['scheme'] ) ) {
+			return $url;
 		}
-
-		return $base . '/' . $normalized_path;
+		return str_replace(
+			$parsed['scheme'] . '://' . $parsed['host'],
+			$parsed['scheme'] . '://' . $host,
+			$url
+		);
 	}, 10, 3 );
 
 	add_filter( 'site_url', function ( $url, $path, $scheme ) use ( $host ) {
-		$base           = rtrim( $scheme . '://' . $host, '/' );
-		$normalized_path = ltrim( (string) $path, '/' );
-
-		if ( $normalized_path === '' ) {
-			return $base . '/';
+		$parsed = wp_parse_url( $url );
+		if ( empty( $parsed['host'] ) || empty( $parsed['scheme'] ) ) {
+			return $url;
 		}
-
-		return $base . '/' . $normalized_path;
+		return str_replace(
+			$parsed['scheme'] . '://' . $parsed['host'],
+			$parsed['scheme'] . '://' . $host,
+			$url
+		);
 	}, 10, 3 );
 
 	// Core canonical (used by the default rel=canonical output).
@@ -194,13 +196,24 @@ function spx_replace_asset_domain( $url ) {
 	if ( strpos( $url, 'uploads.' . SPX_PRIMARY_DOMAIN ) !== false ) {
 		return $url;
 	}
+	// Fast-path: skip processing if the primary domain isn't present at all.
+	if ( stripos( $url, SPX_PRIMARY_DOMAIN ) === false ) {
+		return $url;
+	}
 	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
 	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
 	if ( $host === '' || $host === SPX_PRIMARY_DOMAIN ) {
 		return $url;
 	}
-	return str_replace(
-		[ 'http://' . SPX_PRIMARY_DOMAIN, 'https://' . SPX_PRIMARY_DOMAIN ],
+	return str_ireplace(
+		[
+			'http://'  . SPX_PRIMARY_DOMAIN,
+			'https://' . SPX_PRIMARY_DOMAIN,
+			'//'       . SPX_PRIMARY_DOMAIN,
+			'http://www.'  . SPX_PRIMARY_DOMAIN,
+			'https://www.' . SPX_PRIMARY_DOMAIN,
+			'//www.'       . SPX_PRIMARY_DOMAIN,
+		],
 		'https://' . $host,
 		$url
 	);
@@ -223,6 +236,16 @@ foreach ( $spx_asset_string_filters as $spx_filter ) {
 	add_filter( $spx_filter, 'spx_replace_asset_domain', 99 );
 }
 unset( $spx_filter, $spx_asset_string_filters );
+
+// style_loader_tag / script_loader_tag receive the full HTML tag string – rewrite
+// any primary-domain references that were baked in before enqueue stage.
+add_filter( 'style_loader_tag', function ( $tag ) {
+	return spx_replace_asset_domain( $tag );
+}, 99 );
+
+add_filter( 'script_loader_tag', function ( $tag ) {
+	return spx_replace_asset_domain( $tag );
+}, 99 );
 
 // wp_get_attachment_image_src returns [ url, width, height, is_intermediate ] or false.
 add_filter( 'wp_get_attachment_image_src', function ( $image ) {
