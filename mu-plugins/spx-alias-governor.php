@@ -229,14 +229,14 @@ function spx_replace_asset_domain( $url ) {
 	if ( $host === '' || $host === $primary_domain ) {
 		return $url;
 	}
-	return str_ireplace(
+	return str_replace(
 		[
-			'http://'  . SPX_PRIMARY_DOMAIN,
-			'https://' . SPX_PRIMARY_DOMAIN,
-			'//'       . SPX_PRIMARY_DOMAIN,
-			'http://www.'  . SPX_PRIMARY_DOMAIN,
-			'https://www.' . SPX_PRIMARY_DOMAIN,
-			'//www.'       . SPX_PRIMARY_DOMAIN,
+			'http://'  . $primary_domain,
+			'https://' . $primary_domain,
+			'//'       . $primary_domain,
+			'http://www.'  . $primary_domain,
+			'https://www.' . $primary_domain,
+			'//www.'       . $primary_domain,
 		],
 		'https://' . $host,
 		$url
