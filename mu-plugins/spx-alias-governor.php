@@ -120,27 +120,11 @@ add_action( 'init', function () {
 	 * ALIAS domain frontend → rewrite all generated URLs + canonical to alias.
 	 */
 	add_filter( 'home_url', function ( $url, $path, $scheme ) use ( $host ) {
-		$parsed = wp_parse_url( $url );
-		if ( empty( $parsed['host'] ) || empty( $parsed['scheme'] ) ) {
-			return $url;
-		}
-		return str_replace(
-			$parsed['scheme'] . '://' . $parsed['host'],
-			$parsed['scheme'] . '://' . $host,
-			$url
-		);
+		return spx_swap_url_host( $url, $host );
 	}, 10, 3 );
 
 	add_filter( 'site_url', function ( $url, $path, $scheme ) use ( $host ) {
-		$parsed = wp_parse_url( $url );
-		if ( empty( $parsed['host'] ) || empty( $parsed['scheme'] ) ) {
-			return $url;
-		}
-		return str_replace(
-			$parsed['scheme'] . '://' . $parsed['host'],
-			$parsed['scheme'] . '://' . $host,
-			$url
-		);
+		return spx_swap_url_host( $url, $host );
 	}, 10, 3 );
 
 	// Core canonical (used by the default rel=canonical output).
@@ -173,6 +157,45 @@ add_action( 'init', function () {
 // ---------------------------------------------------------------------------
 
 /**
+ * Reassemble a URL replacing only its host component.
+ *
+ * Parses $url into components, swaps the host, and rebuilds the string so
+ * that port, path, query, and fragment are preserved exactly as WordPress
+ * produced them.  Returns the original $url unchanged when it cannot be
+ * parsed or contains no host.
+ *
+ * @param string $url  The URL to rewrite.
+ * @param string $host The replacement host (already validated).
+ * @return string
+ */
+function spx_swap_url_host( $url, $host ) {
+	$parsed = wp_parse_url( $url );
+	if ( $parsed === false || ! is_array( $parsed ) || empty( $parsed['host'] ) || empty( $parsed['scheme'] ) ) {
+		return $url;
+	}
+	$out = $parsed['scheme'] . '://';
+	if ( ! empty( $parsed['user'] ) ) {
+		$out .= $parsed['user'];
+		if ( ! empty( $parsed['pass'] ) ) {
+			$out .= ':' . $parsed['pass'];
+		}
+		$out .= '@';
+	}
+	$out .= $host;
+	if ( ! empty( $parsed['port'] ) ) {
+		$out .= ':' . $parsed['port'];
+	}
+	$out .= isset( $parsed['path'] ) ? $parsed['path'] : '';
+	if ( ! empty( $parsed['query'] ) ) {
+		$out .= '?' . $parsed['query'];
+	}
+	if ( ! empty( $parsed['fragment'] ) ) {
+		$out .= '#' . $parsed['fragment'];
+	}
+	return $out;
+}
+
+/**
  * Helper: replace the primary domain with the current alias in a simple string URL.
  *
  * Returns the original value unchanged when:
@@ -193,7 +216,7 @@ function spx_replace_asset_domain( $url ) {
 		return $url;
 	}
 	// Skip assets that are explicitly on the uploads subdomain.
-	if ( strpos( $url, 'uploads.' . SPX_PRIMARY_DOMAIN ) !== false ) {
+	if ( stripos( $url, 'uploads.' . SPX_PRIMARY_DOMAIN ) !== false ) {
 		return $url;
 	}
 	// Fast-path: skip processing if the primary domain isn't present at all.
@@ -238,15 +261,30 @@ foreach ( $spx_asset_string_filters as $spx_filter ) {
 }
 unset( $spx_filter, $spx_asset_string_filters );
 
-// style_loader_tag / script_loader_tag receive the full HTML tag string – rewrite
-// any primary-domain references that were baked in before enqueue stage.
-add_filter( 'style_loader_tag', function ( $tag ) {
-	return spx_replace_asset_domain( $tag );
-}, 99 );
+// style_loader_tag / script_loader_tag receive the full HTML tag string.
+// Only rewrite href/src attribute values to avoid corrupting integrity
+// hashes, inline JSON, or other embedded data.
+function spx_replace_asset_domain_in_tag( $tag ) {
+	if ( php_sapi_name() === 'cli' || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+		return $tag;
+	}
+	// Fast-path: skip if the primary domain isn't present in the tag at all.
+	if ( stripos( $tag, SPX_PRIMARY_DOMAIN ) === false ) {
+		return $tag;
+	}
+	return preg_replace_callback(
+		'/(href|src)(\s*=\s*)(["\'])((?:(?!\3).)*)\3/i',
+		function ( $matches ) {
+			return $matches[1] . $matches[2] . $matches[3]
+				. spx_replace_asset_domain( $matches[4] )
+				. $matches[3];
+		},
+		$tag
+	);
+}
 
-add_filter( 'script_loader_tag', function ( $tag ) {
-	return spx_replace_asset_domain( $tag );
-}, 99 );
+add_filter( 'style_loader_tag', 'spx_replace_asset_domain_in_tag', 99 );
+add_filter( 'script_loader_tag', 'spx_replace_asset_domain_in_tag', 99 );
 
 // wp_get_attachment_image_src returns [ url, width, height, is_intermediate ] or false.
 add_filter( 'wp_get_attachment_image_src', function ( $image ) {
