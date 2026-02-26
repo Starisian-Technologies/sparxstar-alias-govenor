@@ -215,17 +215,17 @@ function spx_replace_asset_domain( $url ) {
 	if ( is_admin() || empty( $url ) ) {
 		return $url;
 	}
+	$primary_domain = strtolower( SPX_PRIMARY_DOMAIN );
 	// Skip assets that are explicitly on the uploads subdomain.
-	if ( stripos( $url, 'uploads.' . SPX_PRIMARY_DOMAIN ) !== false ) {
+	if ( stripos( $url, 'uploads.' . $primary_domain ) !== false ) {
 		return $url;
 	}
 	// Fast-path: skip processing if the primary domain isn't present at all.
-	if ( stripos( $url, SPX_PRIMARY_DOMAIN ) === false ) {
+	if ( stripos( $url, $primary_domain ) === false ) {
 		return $url;
 	}
-	$raw_host       = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
-	$host           = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
-	$primary_domain = strtolower( SPX_PRIMARY_DOMAIN );
+	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
 	if ( $host === '' || $host === $primary_domain ) {
 		return $url;
 	}
