@@ -200,9 +200,10 @@ function spx_replace_asset_domain( $url ) {
 	if ( stripos( $url, SPX_PRIMARY_DOMAIN ) === false ) {
 		return $url;
 	}
-	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
-	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
-	if ( $host === '' || $host === SPX_PRIMARY_DOMAIN ) {
+	$raw_host       = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	$host           = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
+	$primary_domain = strtolower( SPX_PRIMARY_DOMAIN );
+	if ( $host === '' || $host === $primary_domain ) {
 		return $url;
 	}
 	return str_ireplace(
