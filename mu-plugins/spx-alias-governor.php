@@ -120,25 +120,11 @@ add_action( 'init', function () {
 	 * ALIAS domain frontend → rewrite all generated URLs + canonical to alias.
 	 */
 	add_filter( 'home_url', function ( $url, $path, $scheme ) use ( $host ) {
-		$base           = rtrim( $scheme . '://' . $host, '/' );
-		$normalized_path = ltrim( (string) $path, '/' );
-
-		if ( $normalized_path === '' ) {
-			return $base . '/';
-		}
-
-		return $base . '/' . $normalized_path;
+		return spx_swap_url_host( $url, $host );
 	}, 10, 3 );
 
 	add_filter( 'site_url', function ( $url, $path, $scheme ) use ( $host ) {
-		$base           = rtrim( $scheme . '://' . $host, '/' );
-		$normalized_path = ltrim( (string) $path, '/' );
-
-		if ( $normalized_path === '' ) {
-			return $base . '/';
-		}
-
-		return $base . '/' . $normalized_path;
+		return spx_swap_url_host( $url, $host );
 	}, 10, 3 );
 
 	// Core canonical (used by the default rel=canonical output).
@@ -171,6 +157,45 @@ add_action( 'init', function () {
 // ---------------------------------------------------------------------------
 
 /**
+ * Reassemble a URL replacing only its host component.
+ *
+ * Parses $url into components, swaps the host, and rebuilds the string so
+ * that port, path, query, and fragment are preserved exactly as WordPress
+ * produced them.  Returns the original $url unchanged when it cannot be
+ * parsed or contains no host.
+ *
+ * @param string $url  The URL to rewrite.
+ * @param string $host The replacement host (already validated).
+ * @return string
+ */
+function spx_swap_url_host( $url, $host ) {
+	$parsed = wp_parse_url( $url );
+	if ( $parsed === false || ! is_array( $parsed ) || empty( $parsed['host'] ) || empty( $parsed['scheme'] ) ) {
+		return $url;
+	}
+	$out = $parsed['scheme'] . '://';
+	if ( ! empty( $parsed['user'] ) ) {
+		$out .= $parsed['user'];
+		if ( ! empty( $parsed['pass'] ) ) {
+			$out .= ':' . $parsed['pass'];
+		}
+		$out .= '@';
+	}
+	$out .= $host;
+	if ( ! empty( $parsed['port'] ) ) {
+		$out .= ':' . $parsed['port'];
+	}
+	$out .= isset( $parsed['path'] ) ? $parsed['path'] : '';
+	if ( ! empty( $parsed['query'] ) ) {
+		$out .= '?' . $parsed['query'];
+	}
+	if ( ! empty( $parsed['fragment'] ) ) {
+		$out .= '#' . $parsed['fragment'];
+	}
+	return $out;
+}
+
+/**
  * Helper: replace the primary domain with the current alias in a simple string URL.
  *
  * Returns the original value unchanged when:
@@ -190,17 +215,29 @@ function spx_replace_asset_domain( $url ) {
 	if ( is_admin() || empty( $url ) ) {
 		return $url;
 	}
+	$primary_domain = strtolower( SPX_PRIMARY_DOMAIN );
 	// Skip assets that are explicitly on the uploads subdomain.
-	if ( strpos( $url, 'uploads.' . SPX_PRIMARY_DOMAIN ) !== false ) {
+	if ( stripos( $url, 'uploads.' . $primary_domain ) !== false ) {
+		return $url;
+	}
+	// Fast-path: skip processing if the primary domain isn't present at all.
+	if ( stripos( $url, $primary_domain ) === false ) {
 		return $url;
 	}
 	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
 	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
-	if ( $host === '' || $host === SPX_PRIMARY_DOMAIN ) {
+	if ( $host === '' || $host === $primary_domain ) {
 		return $url;
 	}
 	return str_replace(
-		[ 'http://' . SPX_PRIMARY_DOMAIN, 'https://' . SPX_PRIMARY_DOMAIN ],
+		[
+			'http://'  . $primary_domain,
+			'https://' . $primary_domain,
+			'//'       . $primary_domain,
+			'http://www.'  . $primary_domain,
+			'https://www.' . $primary_domain,
+			'//www.'       . $primary_domain,
+		],
 		'https://' . $host,
 		$url
 	);
@@ -223,6 +260,34 @@ foreach ( $spx_asset_string_filters as $spx_filter ) {
 	add_filter( $spx_filter, 'spx_replace_asset_domain', 99 );
 }
 unset( $spx_filter, $spx_asset_string_filters );
+
+// style_loader_tag / script_loader_tag receive the full HTML tag string.
+// Only rewrite href/src attribute values to avoid corrupting integrity
+// hashes, inline JSON, or other embedded data.
+function spx_replace_asset_domain_in_tag( $tag ) {
+	if ( php_sapi_name() === 'cli' || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+		return $tag;
+	}
+	if ( is_admin() || empty( $tag ) ) {
+		return $tag;
+	}
+	// Fast-path: skip if the primary domain isn't present in the tag at all.
+	if ( stripos( $tag, SPX_PRIMARY_DOMAIN ) === false ) {
+		return $tag;
+	}
+	return preg_replace_callback(
+		'/(href|src)(\s*=\s*)(["\'])((?:(?!\3).)*)\3/i',
+		function ( $matches ) {
+			return $matches[1] . $matches[2] . $matches[3]
+				. spx_replace_asset_domain( $matches[4] )
+				. $matches[3];
+		},
+		$tag
+	);
+}
+
+add_filter( 'style_loader_tag', 'spx_replace_asset_domain_in_tag', 99 );
+add_filter( 'script_loader_tag', 'spx_replace_asset_domain_in_tag', 99 );
 
 // wp_get_attachment_image_src returns [ url, width, height, is_intermediate ] or false.
 add_filter( 'wp_get_attachment_image_src', function ( $image ) {
