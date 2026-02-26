@@ -268,6 +268,9 @@ function spx_replace_asset_domain_in_tag( $tag ) {
 	if ( php_sapi_name() === 'cli' || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
 		return $tag;
 	}
+	if ( is_admin() || empty( $tag ) ) {
+		return $tag;
+	}
 	// Fast-path: skip if the primary domain isn't present in the tag at all.
 	if ( stripos( $tag, SPX_PRIMARY_DOMAIN ) === false ) {
 		return $tag;
