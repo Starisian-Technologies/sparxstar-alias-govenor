@@ -73,6 +73,13 @@ add_action( 'init', function () {
 		return;
 	}
 
+	// Use WordPress's own native domain for this site — works for any multisite
+	// topology (subdomain, subdirectory, any network domain) without constants.
+	$spx_site     = get_site();
+	$native_host  = $spx_site ? strtolower( $spx_site->domain ) : strtolower( SPX_PRIMARY_DOMAIN );
+	$current_host = strtolower( $host );
+	$is_canonical = ( $current_host === $native_host );
+
 	// Never touch admin or login pages – sunrise already enforces those.
 	if (
 		is_admin() ||
@@ -83,7 +90,7 @@ add_action( 'init', function () {
 	}
 
 	// Defense-in-depth: hard-block xmlrpc on alias domains (exact path only).
-	if ( $host !== SPX_PRIMARY_DOMAIN && preg_match( '#^/xmlrpc\.php$#', $uri ) ) {
+	if ( ! $is_canonical && preg_match( '#^/xmlrpc\.php$#', $uri ) ) {
 		wp_die(
 			'XML-RPC endpoint is disabled on this domain.',
 			'Forbidden',
@@ -92,21 +99,21 @@ add_action( 'init', function () {
 	}
 
 	/**
-	 * PRIMARY domain frontend → redirect to the canonical alias.
+	 * NATIVE (canonical) domain frontend → redirect to the mapped alias.
 	 *
 	 * Mercator maps domain → blog, so home_url() already reflects the
 	 * canonical (alias) host for the current site.  If the user is
-	 * browsing the primary domain for frontend content, send them to
+	 * browsing the native domain for frontend content, send them to
 	 * the alias with a 301.
 	 */
-	if ( $host === SPX_PRIMARY_DOMAIN ) {
+	if ( $is_canonical ) {
 		$home   = home_url( '/' );
 		$parsed = wp_parse_url( $home );
 
 		if (
 			! empty( $parsed['host'] ) &&
-			$parsed['host'] !== SPX_PRIMARY_DOMAIN &&
-			$parsed['host'] !== $host
+			$parsed['host'] !== $native_host &&
+			$parsed['host'] !== $current_host
 		) {
 			$scheme = is_ssl() ? 'https://' : 'http://';
 			wp_safe_redirect( $scheme . $parsed['host'] . $uri, 301 );
@@ -153,7 +160,9 @@ add_action( 'init', function () {
 
 // ---------------------------------------------------------------------------
 // 2. Deep Asset Filters
-// Replaces the primary domain with the current alias for all standard WP asset hooks.
+// Replaces the site's native WordPress domain with the current alias for all
+// standard WP asset hooks.  Uses get_site()->domain so it works for any
+// multisite topology without requiring domain constants.
 // ---------------------------------------------------------------------------
 
 /**
@@ -196,14 +205,18 @@ function spx_swap_url_host( $url, $host ) {
 }
 
 /**
- * Helper: replace the primary domain with the current alias in a simple string URL.
+ * Helper: replace the site's native WordPress domain with the current alias in a simple string URL.
+ *
+ * The native host is read from get_site()->domain so the function works
+ * correctly for any multisite topology without requiring the SPX_PRIMARY_DOMAIN
+ * constant.
  *
  * Returns the original value unchanged when:
  *  - running under CLI / WP-CLI
  *  - inside wp-admin
  *  - the URL is empty
  *  - the URL belongs to the uploads subdomain
- *  - the current host is the primary domain or cannot be determined
+ *  - the current host is the native domain or cannot be determined
  *
  * @param string $url
  * @return string
@@ -215,28 +228,29 @@ function spx_replace_asset_domain( $url ) {
 	if ( is_admin() || empty( $url ) ) {
 		return $url;
 	}
-	$primary_domain = strtolower( SPX_PRIMARY_DOMAIN );
+	$spx_site    = get_site();
+	$native_host = $spx_site ? strtolower( $spx_site->domain ) : strtolower( SPX_PRIMARY_DOMAIN );
 	// Skip assets that are explicitly on the uploads subdomain.
-	if ( stripos( $url, 'uploads.' . $primary_domain ) !== false ) {
+	if ( stripos( $url, 'uploads.' . $native_host ) !== false ) {
 		return $url;
 	}
-	// Fast-path: skip processing if the primary domain isn't present at all.
-	if ( stripos( $url, $primary_domain ) === false ) {
+	// Fast-path: skip processing if the native domain isn't present at all.
+	if ( stripos( $url, $native_host ) === false ) {
 		return $url;
 	}
 	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
 	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
-	if ( $host === '' || $host === $primary_domain ) {
+	if ( $host === '' || $host === $native_host ) {
 		return $url;
 	}
 	return str_replace(
 		[
-			'http://'  . $primary_domain,
-			'https://' . $primary_domain,
-			'//'       . $primary_domain,
-			'http://www.'  . $primary_domain,
-			'https://www.' . $primary_domain,
-			'//www.'       . $primary_domain,
+			'http://'      . $native_host,
+			'https://'     . $native_host,
+			'//'           . $native_host,
+			'http://www.'  . $native_host,
+			'https://www.' . $native_host,
+			'//www.'       . $native_host,
 		],
 		'https://' . $host,
 		$url
@@ -271,8 +285,9 @@ function spx_replace_asset_domain_in_tag( $tag ) {
 	if ( is_admin() || empty( $tag ) ) {
 		return $tag;
 	}
-	// Fast-path: skip if the primary domain isn't present in the tag at all.
-	if ( stripos( $tag, SPX_PRIMARY_DOMAIN ) === false ) {
+	// Fast-path: skip if the native domain isn't present in the tag at all.
+	$spx_site_tag = get_site();
+	if ( $spx_site_tag && stripos( $tag, $spx_site_tag->domain ) === false ) {
 		return $tag;
 	}
 	return preg_replace_callback(
@@ -335,26 +350,29 @@ add_action( 'template_redirect', function () {
 	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
 	$host     = ( $raw_host !== '' && preg_match( '/^[A-Za-z0-9.-]+$/', $raw_host ) ) ? strtolower( $raw_host ) : '';
 
-	if ( $host === '' || $host === SPX_PRIMARY_DOMAIN ) {
+	$spx_site    = get_site();
+	$native_host = $spx_site ? strtolower( $spx_site->domain ) : strtolower( SPX_PRIMARY_DOMAIN );
+
+	if ( $host === '' || $host === $native_host ) {
 		return;
 	}
 
-	ob_start( function ( $html ) use ( $host ) {
+	ob_start( function ( $html ) use ( $host, $native_host ) {
 		// Only run on actual HTML documents; skip REST, XML feeds, JSON, etc.
 		if ( stripos( $html, '<!DOCTYPE' ) === false && stripos( $html, '<html' ) === false ) {
 			return $html;
 		}
-		// Replace all primary-domain URL variants with the alias.
-		// None of these prefixes match 'uploads.' . SPX_PRIMARY_DOMAIN, so
+		// Replace all native-domain URL variants with the alias.
+		// None of these prefixes match 'uploads.' . $native_host, so
 		// uploads subdomain URLs are inherently preserved.
 		return str_replace(
 			[
-				'http://'      . SPX_PRIMARY_DOMAIN,
-				'https://'     . SPX_PRIMARY_DOMAIN,
-				'//'           . SPX_PRIMARY_DOMAIN,
-				'http://www.'  . SPX_PRIMARY_DOMAIN,
-				'https://www.' . SPX_PRIMARY_DOMAIN,
-				'//www.'       . SPX_PRIMARY_DOMAIN,
+				'http://'      . $native_host,
+				'https://'     . $native_host,
+				'//'           . $native_host,
+				'http://www.'  . $native_host,
+				'https://www.' . $native_host,
+				'//www.'       . $native_host,
 			],
 			'https://' . $host,
 			$html
@@ -372,15 +390,19 @@ add_filter( 'wpseo_sitemap_url', function ( $url ) {
 		return $url;
 	}
 
-	$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	$raw_host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : '';
+	$host     = strtolower( $raw_host );
 
-	if ( $host === '' || $host === SPX_PRIMARY_DOMAIN ) {
+	$spx_site    = get_site();
+	$native_host = $spx_site ? strtolower( $spx_site->domain ) : strtolower( SPX_PRIMARY_DOMAIN );
+
+	if ( $host === '' || $host === $native_host ) {
 		return $url;
 	}
 
-	// Replace the primary domain prefix only (avoids false matches in query strings).
-	$primary_https = 'https://' . SPX_PRIMARY_DOMAIN;
-	$primary_http  = 'http://'  . SPX_PRIMARY_DOMAIN;
+	// Replace the native domain prefix only (avoids false matches in query strings).
+	$primary_https = 'https://' . $native_host;
+	$primary_http  = 'http://'  . $native_host;
 
 	if ( strpos( $url, $primary_https ) === 0 ) {
 		return 'https://' . $host . substr( $url, strlen( $primary_https ) );
